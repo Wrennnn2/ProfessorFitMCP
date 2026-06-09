@@ -21,6 +21,16 @@ def _pipe_table(headers: list[str], rows: list[list]) -> str:
     return "\n".join(lines)
 
 
+def _val(field) -> str:
+    """Extract display value from either a raw value or a SourcedField dict."""
+    if isinstance(field, dict) and "value" in field:
+        v = field["value"]
+        return str(v) if v is not None else "-"
+    if field is None:
+        return "-"
+    return str(field)
+
+
 def to_markdown(ranked: list[dict], include_summary: bool = False) -> str:
     rows = []
     for i, entry in enumerate(ranked, 1):
@@ -28,11 +38,11 @@ def to_markdown(ranked: list[dict], include_summary: bool = False) -> str:
         rows.append([
             i,
             prof.get("name", ""),
-            prof.get("institution", ""),
+            _val(prof.get("institution")),
             prof.get("country_code", ""),
             prof.get("institution_tier") or "-",
-            (prof.get("h_index") or {}).get("value", "-"),
-            (prof.get("citation_count") or {}).get("value", "-"),
+            _val(prof.get("h_index")),
+            _val(prof.get("citation_count")),
             prof.get("seniority") or "-",
             entry.get("relevance_signal", "-"),
             prof.get("homepage_url") or "-",

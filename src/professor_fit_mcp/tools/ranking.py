@@ -45,7 +45,11 @@ def _extract_keywords(user_interests: dict) -> list[str]:
 
 
 def _apply_filters(professor: dict, filters: dict) -> bool:
-    citation = (professor.get("citation_count") or {}).get("value") or 0
+    raw_citation = professor.get("citation_count")
+    if isinstance(raw_citation, dict):
+        citation = raw_citation.get("value") or 0
+    else:
+        citation = raw_citation or 0
     if filters.get("min_citation") and citation < filters["min_citation"]:
         return False
     if filters.get("regions"):
@@ -94,10 +98,10 @@ async def rank_fit_impl(
         })
 
     if sort_by == "citation":
-        ranked.sort(
-            key=lambda x: (x["professor"].get("citation_count") or {}).get("value") or 0,
-            reverse=True,
-        )
+        def _get_citation(x):
+            c = x["professor"].get("citation_count")
+            return c.get("value") or 0 if isinstance(c, dict) else c or 0
+        ranked.sort(key=_get_citation, reverse=True)
     else:
         ranked.sort(key=lambda x: x["relevance_signal"], reverse=True)
 

@@ -108,7 +108,7 @@ class OpenAlexService:
     ) -> list[Paper]:
         params = self._params(
             {
-                "filter": f"authorships.author.id:{openalex_id},publication_year:>={since_year}",
+                "filter": f"authorships.author.id:{openalex_id},publication_year:{since_year}-2026",
                 "per_page": str(min(limit, 50)),
                 "select": "id,title,publication_year,primary_location,abstract_inverted_index,authorships,doi,ids",
             }
