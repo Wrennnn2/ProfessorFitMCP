@@ -36,7 +36,7 @@ def mock_openalex_results():
 @pytest.mark.asyncio
 async def test_search_returns_professors(mock_openalex_results):
     with patch(
-        "professor_fit_mcp.tools.search.OpenAlexService.search_authors",
+        "professor_fit_mcp.tools.search.OpenAlexService.search_works_authors",
         new=AsyncMock(return_value=mock_openalex_results),
     ):
         result = await search_professors_impl(
@@ -53,7 +53,7 @@ async def test_search_returns_professors(mock_openalex_results):
 @pytest.mark.asyncio
 async def test_search_adds_homepage_search_query(mock_openalex_results):
     with patch(
-        "professor_fit_mcp.tools.search.OpenAlexService.search_authors",
+        "professor_fit_mcp.tools.search.OpenAlexService.search_works_authors",
         new=AsyncMock(return_value=mock_openalex_results),
     ):
         result = await search_professors_impl(keywords=["blockchain"])
@@ -79,7 +79,7 @@ async def test_search_region_filter():
         "homepage_url": None,
     }]
     with patch(
-        "professor_fit_mcp.tools.search.OpenAlexService.search_authors",
+        "professor_fit_mcp.tools.search.OpenAlexService.search_works_authors",
         new=AsyncMock(return_value=cn_result),
     ):
         result = await search_professors_impl(

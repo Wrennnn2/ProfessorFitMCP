@@ -184,6 +184,44 @@ def test_get_author_not_found():
     asyncio.run(_run())
 
 
+def test_search_works_authors():
+    svc = _make_svc()
+    works_resp = _mock_response({
+        "results": [
+            {
+                "id": "https://openalex.org/W1",
+                "authorships": [
+                    {"author": {"id": "https://openalex.org/A111", "display_name": "Alice"}},
+                    {"author": {"id": "https://openalex.org/A222", "display_name": "Bob"}},
+                ],
+            },
+            {
+                "id": "https://openalex.org/W2",
+                "authorships": [
+                    {"author": {"id": "https://openalex.org/A111", "display_name": "Alice"}},
+                ],
+            },
+        ],
+    })
+    author_detail = _author_response()["results"][0].copy()
+    author_detail["id"] = "https://openalex.org/A111"
+    author_resp = _mock_response(author_detail)
+
+    async def _run():
+        with patch("httpx.AsyncClient") as MockClient:
+            client_instance = AsyncMock()
+            client_instance.get = AsyncMock(side_effect=[works_resp, author_resp])
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            results = await svc.search_works_authors("machine learning", limit=1)
+
+        assert len(results) == 1
+        assert results[0]["openalex_id"] == "A111"
+
+    asyncio.run(_run())
+
+
 def test_parse_abstract():
     from professor_fit_mcp.services.openalex import _parse_abstract
 

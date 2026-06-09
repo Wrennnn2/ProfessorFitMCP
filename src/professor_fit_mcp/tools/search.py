@@ -62,7 +62,7 @@ async def search_professors_impl(
 
     cache_key = f"search:{query}:{limit}"
     cached = cache.get(cache_key, "professors")
-    raw_results = cached if cached else await svc.search_authors(query, limit=limit * 2)
+    raw_results = cached if cached else await svc.search_works_authors(query, limit=limit * 2)
     if not cached:
         cache.set(cache_key, raw_results, "professors", ttl_seconds=Cache.PROFESSOR_TTL)
 

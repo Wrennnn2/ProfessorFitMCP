@@ -63,6 +63,46 @@ class OpenAlexService:
             resp.raise_for_status()
         return self._parse_author(resp.json())
 
+    async def search_works_authors(
+        self,
+        keywords: str,
+        since_year: int = 2021,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Search works by topic, then extract and aggregate unique authors."""
+        params = self._params({
+            "search": keywords,
+            "filter": f"from_publication_date:{since_year}-01-01",
+            "per_page": str(min(limit * 5, 200)),
+            "select": "id,authorships",
+        })
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.get(f"{_BASE}/works", params=params)
+            resp.raise_for_status()
+
+        works = resp.json().get("results", [])
+
+        author_ids: dict[str, int] = {}
+        for work in works:
+            for authorship in (work.get("authorships") or []):
+                author = authorship.get("author") or {}
+                author_id = author.get("id", "")
+                if not author_id:
+                    continue
+                aid = _extract_id(author_id)
+                author_ids[aid] = author_ids.get(aid, 0) + 1
+
+        sorted_ids = sorted(author_ids.items(), key=lambda x: x[1], reverse=True)
+        top_ids = [aid for aid, _ in sorted_ids[:limit * 2]]
+
+        results = []
+        for aid in top_ids[:limit]:
+            author_data = await self.get_author(aid)
+            if author_data:
+                results.append(author_data)
+
+        return results
+
     async def get_recent_works(
         self, openalex_id: str, since_year: int = 2023, limit: int = 50
     ) -> list[Paper]:
