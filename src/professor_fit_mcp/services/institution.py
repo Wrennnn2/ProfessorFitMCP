@@ -29,18 +29,11 @@ class InstitutionClassifier:
             for name in names:
                 self._index[name.lower()] = {"tier": tier, "country": country}
 
-        cn_path = data_dir / "cn_985_211.json"
-        if cn_path.exists():
-            data = json.loads(cn_path.read_text(encoding="utf-8"))
-            for tier, names in data.items():
-                for name in names:
-                    self._index[name.lower()] = {"tier": tier.upper(), "country": "CN"}
 
     def _country_ok(self, info: dict, country_code: Optional[str]) -> bool:
         """When a country is known, only accept index entries from that country.
 
-        Prevents same-name collisions across countries, e.g. US "Northeastern
-        University" vs the Chinese (211) "Northeastern University".
+        Prevents same-name collisions across countries.
         """
         if not country_code:
             return True

@@ -70,8 +70,8 @@ async def find_professors(
                  Receives domain_weight scoring (lower than topic).
         topic_weight: Score multiplier for topic query hits (default 3.0).
         domain_weight: Score multiplier for domain query hits (default 1.0).
-        regions: Country/region codes. Supported: US, UK/GB, CN, JP, KR, DE, CA, AU, SG, HK, ASIA, ALL
-        institution_tier: Filter by tier, e.g. ["R1", "Russell", "985", "HK5"]
+        regions: Country/region codes. Supported: US, UK/GB, JP, KR, DE, CA, AU, SG, HK, ASIA, ALL
+        institution_tier: Filter by tier, e.g. ["R1", "Russell", "HK5"]
         required_keywords: Domain-anchor terms for precision gating.
         min_relevance: Minimum relevance score (0.0-1.0) to keep a professor.
         limit: Max number of professors (default 10).
@@ -121,9 +121,9 @@ async def search_professors(
         topic_weight: Multiplier for topic hits (default 3.0).
         domain_weight: Multiplier for domain hits (default 1.0).
         paper_url: Optional arXiv/DOI URL to extract keywords from.
-        regions: Country/region codes. Supported: US, UK/GB, CN, JP, KR, DE, CA, AU, SG, HK, ASIA, ALL
+        regions: Country/region codes. Supported: US, UK/GB, JP, KR, DE, CA, AU, SG, HK, ASIA, ALL
         university_filter: Specific university names to include.
-        institution_tier: Filter by tier, e.g. ["R1", "Russell", "985", "HK5"]
+        institution_tier: Filter by tier, e.g. ["R1", "Russell", "HK5"]
         limit: Max number of results (default 20).
         since_year: Only papers from this year onward (default: current_year - 7).
 

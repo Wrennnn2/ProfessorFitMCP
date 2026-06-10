@@ -70,26 +70,26 @@ pip install -e .
 直接用 `find_professors`，一次完成「意图分析 → 搜索 → 详情 → 排序 → 生成 Markdown 表格」：
 
 ```
-帮我搜 order fairness in blockchain or DeFi 方向的美国 R1 和香港五校教授
+帮我找 mev + defi 方向的美国 R1 院校教授
 ```
 
 Cursor / Claude 会自动拆分 topic vs domain 并调用：
 
 ```python
 find_professors(
-    keywords=["order fairness", "blockchain", "DeFi"],
-    topic_keywords=["order fairness", "fair ordering", "fair transaction ordering"],
-    domain_keywords=["blockchain", "DeFi", "decentralized finance"],
+    keywords=["MEV", "DeFi"],
+    topic_keywords=["MEV", "maximal extractable value", "frontrunning"],
+    domain_keywords=["DeFi", "decentralized finance", "blockchain"],
     topic_weight=3.0,    # topic 命中的论文得分 ×3
     domain_weight=1.0,   # domain 命中的论文得分 ×1
-    regions=["US", "HK"],
-    institution_tier=["R1", "HK5"],
+    regions=["US"],
+    institution_tier=["R1"],
     limit=30,
     since_year=2018,
 )
 ```
 
-**关键词优先级**：`topic_keywords` 中的查询命中权重 ×3，确保做 "order fairness" 的人排名远高于泛 "blockchain consensus" 研究者。Cursor 的 Claude 会从 tool docstring 中理解 topic/domain 语义，自动拆分——无需额外 LLM 成本。
+**关键词优先级**：`topic_keywords` 中的查询命中权重 ×3，确保做 MEV 的人排名远高于泛 DeFi/blockchain 研究者。Cursor 的 Claude 会从 tool docstring 中理解 topic/domain 语义，自动拆分——无需额外 LLM 成本。
 
 返回 Markdown 表格并**自动保存**（路径在 `saved_to` 中）。
 
@@ -99,7 +99,7 @@ find_professors(
 
 ```python
 find_professors(
-    keywords=["order fairness", "blockchain", "DeFi"],
+    keywords=["MEV", "DeFi"],
     regions=["US"],
     limit=10,
 )
@@ -143,8 +143,8 @@ find_professors(
 
 ### 筛选参数
 
-- `regions`：`US`, `UK`/`GB`, `CN`, `JP`, `KR`, `DE`, `CA`, `AU`, `SG`, `HK`, `ASIA`, `ALL`
-- `institution_tier`：`R1`（美）, `HK5`（港五校）, `985`/`211`（中）, `Russell`（英）, `Go8`（澳）, `U15`（加）, `TU9`（德）, `Imperial`（日）, `SKY`（韩）
+- `regions`：`US`, `UK`/`GB`, `JP`, `KR`, `DE`, `CA`, `AU`, `SG`, `HK`, `ASIA`, `ALL`
+- `institution_tier`：`R1`（美）, `HK5`（港五校）, `Russell`（英）, `Go8`（澳）, `U15`（加）, `TU9`（德）, `Imperial`（日）, `SKY`（韩）
 - `topic_keywords`：核心研究课题（教授必须直接做这个方向）。高评分权重。
 - `domain_keywords`：领域上下文（教授在这个大领域中工作）。低评分权重。
 - `topic_weight` / `domain_weight`：topic/domain 查询的得分倍数（默认 3.0 / 1.0）
@@ -230,6 +230,6 @@ uv run pytest tests/ -v
 | OpenAlex | 主干：指标/机构/concepts/论文/作者消歧 | 否 |
 | DBLP | CS 发表记录、主页 URL、当前机构、首发年（全量并发查询） | 否 |
 | 个人主页 | best-effort：职称/email/lab/招生信号 | 否 |
-| 院校分级 | 内置 JSON（R1/HK5/985/Russell 等） | 否 |
+| 院校分级 | 内置 JSON（R1/HK5/Russell 等） | 否 |
 | LLM（可选） | 查询意图分析：topic/domain 拆分 + 同义词扩展 + 拼写纠错 | 可选 |
 | professor_profiles.db | 本地资料库：持久化档案 + WebSearch 证据 + 交叉验证 | 否 |
