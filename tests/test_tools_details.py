@@ -5,15 +5,15 @@ import professor_fit_mcp.tools.details as details_mod
 
 
 @pytest.fixture(autouse=True)
-def _reset_cache(tmp_path):
-    details_mod._cache = None
+def _reset_store(tmp_path):
+    details_mod._profile_store = None
     details_mod._institution_clf = None
     import os
-    os.environ["PROFESSOR_FIT_CACHE_PATH"] = str(tmp_path / "test_cache.db")
+    os.environ["PROFESSOR_PROFILES_DB_PATH"] = str(tmp_path / "test_profiles.db")
     yield
-    details_mod._cache = None
+    details_mod._profile_store = None
     details_mod._institution_clf = None
-    os.environ.pop("PROFESSOR_FIT_CACHE_PATH", None)
+    os.environ.pop("PROFESSOR_PROFILES_DB_PATH", None)
 
 
 @pytest.mark.asyncio

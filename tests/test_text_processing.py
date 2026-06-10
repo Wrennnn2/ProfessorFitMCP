@@ -1,15 +1,32 @@
-from professor_fit_mcp.utils.text_processing import whole_word_match, compute_keyword_overlap
+from professor_fit_mcp.utils.text_processing import (
+    whole_word_match,
+    compute_keyword_overlap,
+    flexible_phrase_match,
+)
 
 
-def test_whole_word_match_found():
-    assert whole_word_match("blockchain", "research on blockchain consensus") is True
+def test_flexible_phrase_match_word_order_independent():
+    # word order in the keyword should not matter
+    assert flexible_phrase_match("fairness order", "transaction order with fairness") is True
 
 
-def test_whole_word_match_not_found():
-    assert whole_word_match("blockchain", "AI security and networking") is False
+def test_flexible_phrase_match_hyphenated():
+    # "order fairness" matches "Order-Fairness" (hyphen is a word boundary)
+    assert flexible_phrase_match("order fairness", "Strong Order-Fairness in Byzantine Consensus") is True
+
+
+def test_flexible_phrase_match_missing_word():
+    # only one of the two words present -> no match
+    assert flexible_phrase_match("order fairness", "fast transaction processing") is False
+
+
+def test_flexible_phrase_match_single_word_strict():
+    assert flexible_phrase_match("blockchain", "blockchain consensus") is True
+    assert flexible_phrase_match("block", "blockchain consensus") is False
 
 
 def test_whole_word_match_no_partial():
+    # non-obvious: "block" must NOT match inside "blockchain"
     assert whole_word_match("block", "blockchain research") is False
 
 

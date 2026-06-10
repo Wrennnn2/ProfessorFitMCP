@@ -5,13 +5,10 @@ import professor_fit_mcp.tools.search as search_mod
 
 
 @pytest.fixture(autouse=True)
-def _reset_cache(tmp_path):
-    search_mod._cache = None
-    import os
-    os.environ["PROFESSOR_FIT_CACHE_PATH"] = str(tmp_path / "test_cache.db")
+def _reset(tmp_path):
+    search_mod._institution_clf = None
     yield
-    search_mod._cache = None
-    os.environ.pop("PROFESSOR_FIT_CACHE_PATH", None)
+    search_mod._institution_clf = None
 
 
 @pytest.fixture

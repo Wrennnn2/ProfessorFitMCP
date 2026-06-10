@@ -1,8 +1,11 @@
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
 from typing import Any, Optional
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 class Cache:
@@ -11,7 +14,12 @@ class Cache:
     PROFESSOR_TTL = 7 * 24 * 3600   # 7 days
     HOMEPAGE_TTL = 1 * 24 * 3600    # 1 day
 
-    def __init__(self, db_path: "Path | str"):
+    def __init__(self, db_path: "Path | str | None" = None):
+        if db_path is None:
+            db_path = os.getenv(
+                "PROFESSOR_FIT_CACHE_PATH",
+                str(_PROJECT_ROOT / "professor_fit_cache.db"),
+            )
         self._db_path = str(db_path)
         self._init_db()
 

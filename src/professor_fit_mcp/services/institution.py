@@ -19,6 +19,7 @@ class InstitutionClassifier:
             ("de_tu9.json", "TU9", "DE"),
             ("jp_imperial.json", "Imperial", "JP"),
             ("kr_sky.json", "SKY", "KR"),
+            ("hk_top5.json", "HK5", "HK"),
         ]
         for filename, tier, country in configs:
             path = data_dir / filename
@@ -35,9 +36,41 @@ class InstitutionClassifier:
                 for name in names:
                     self._index[name.lower()] = {"tier": tier.upper(), "country": "CN"}
 
+    def _country_ok(self, info: dict, country_code: Optional[str]) -> bool:
+        """When a country is known, only accept index entries from that country.
+
+        Prevents same-name collisions across countries, e.g. US "Northeastern
+        University" vs the Chinese (211) "Northeastern University".
+        """
+        if not country_code:
+            return True
+        return info["country"] == country_code
+
     def classify(self, institution_name: str, country_code: Optional[str] = None) -> dict:
         key = institution_name.lower().strip()
+        if not key:
+            return {"tier": None, "country": country_code}
+
+        # 1. Exact match (must agree on country if one is provided)
         entry = self._index.get(key)
-        if entry:
+        if entry and self._country_ok(entry, country_code):
             return {"tier": entry["tier"], "country": entry["country"]}
+
+        # 2. Fuzzy match: a known institution name is contained in the query
+        #    or vice versa (e.g. "Berkeley College" vs "University of California, Berkeley").
+        #    Prefer the longest matching known name to avoid spurious short hits.
+        best: Optional[dict] = None
+        best_len = 0
+        for known_name, info in self._index.items():
+            if len(known_name) < 5:
+                continue  # skip very short names to avoid false positives
+            if not self._country_ok(info, country_code):
+                continue
+            if known_name in key or key in known_name:
+                if len(known_name) > best_len:
+                    best = info
+                    best_len = len(known_name)
+        if best:
+            return {"tier": best["tier"], "country": best["country"]}
+
         return {"tier": None, "country": country_code}

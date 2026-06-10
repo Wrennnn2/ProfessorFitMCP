@@ -11,7 +11,7 @@ from ..exporters.json_export import to_json
 def export_table_impl(
     professors: list[dict],
     format: str = "markdown",
-    include_summary: bool = False,
+    include_summary: bool = True,
     output_path: Optional[str] = None,
 ) -> dict:
     fmt = format.lower()

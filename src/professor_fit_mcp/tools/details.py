@@ -9,17 +9,17 @@ from ..services.dblp import DBLPService
 from ..services.homepage import HomepageService
 from ..services.institution import InstitutionClassifier
 from ..models.professor import compute_seniority
-from ..utils.cache import Cache
+from ..utils.profile_store import ProfileStore
 
-_cache: Optional[Cache] = None
+_profile_store: Optional[ProfileStore] = None
 _institution_clf: Optional[InstitutionClassifier] = None
 
 
-def _get_cache() -> Cache:
-    global _cache
-    if _cache is None:
-        _cache = Cache(Path(os.getenv("PROFESSOR_FIT_CACHE_PATH", "professor_fit_cache.db")))
-    return _cache
+def _get_profile_store() -> ProfileStore:
+    global _profile_store
+    if _profile_store is None:
+        _profile_store = ProfileStore()
+    return _profile_store
 
 
 def _get_classifier() -> InstitutionClassifier:
@@ -33,12 +33,37 @@ def _sourced(value, sources: list[str], confidence: str) -> dict:
     return {"value": value, "sources": sources, "confidence": confidence}
 
 
+def _dedup_papers(papers: list) -> list:
+    """Drop duplicate papers that share a normalized title (arXiv/conf/journal versions)."""
+    seen_titles: set[str] = set()
+    result = []
+    for p in papers:
+        title = (getattr(p, "title", "") or "").lower().strip()
+        if not title:
+            result.append(p)
+            continue
+        if title not in seen_titles:
+            seen_titles.add(title)
+            result.append(p)
+    return result
+
+
 async def get_professor_details_impl(
     professor_id: Optional[str] = None,
     name: Optional[str] = None,
     university: Optional[str] = None,
+    hint_country: Optional[str] = None,
+    hint_institution: Optional[str] = None,
+    hint_tier: Optional[str] = None,
 ) -> dict:
-    cache = _get_cache()
+    """
+    hint_* values come from the search stage, which resolves the current
+    institution from per-year affiliations (more reliable than OpenAlex's stale
+    last_known_institutions). When provided they take precedence, so a professor
+    who recently moved (e.g. last_known still says a former country) is reported
+    at the correct current institution.
+    """
+    store = _get_profile_store()
     institution_clf = _get_classifier()
 
     oa_svc = OpenAlexService()
@@ -55,18 +80,18 @@ async def get_professor_details_impl(
 
     openalex_id = oa_author["openalex_id"]
 
-    cached = cache.get(openalex_id, "professor_details")
-    if cached:
-        return cached
-
     recent_papers = await oa_svc.get_recent_works(openalex_id, since_year=2023)
+    recent_papers = _dedup_papers(recent_papers)
 
     dblp_svc = DBLPService()
     dblp_record = None
     search_name = oa_author.get("name", name or "")
-    dblp_results = await dblp_svc.search_person(search_name, limit=3)
-    if dblp_results:
-        dblp_record = await dblp_svc.get_person_record(dblp_results[0]["pid"])
+    try:
+        dblp_results = await dblp_svc.search_person(search_name, limit=3)
+        if dblp_results:
+            dblp_record = await dblp_svc.get_person_record(dblp_results[0]["pid"])
+    except Exception:
+        dblp_record = None
 
     homepage_url = None
     homepage_source = None
@@ -85,9 +110,35 @@ async def get_professor_details_impl(
         hp_svc = HomepageService()
         homepage_data = await hp_svc.fetch(homepage_url)
 
-    inst_name = oa_author.get("institution") or ""
     country_code = oa_author.get("country_code")
+    oa_inst = oa_author.get("institution") or ""
+    dblp_affiliation = dblp_record.get("affiliation") if dblp_record else None
+
+    # DBLP affiliation is curated and current; prefer it for display/classification
+    # when OpenAlex's institution is missing or when we have a DBLP-verified value.
+    inst_name = oa_inst or (dblp_affiliation or "")
+    inst_sources = []
+    if oa_inst:
+        inst_sources.append("openalex")
+    if dblp_affiliation:
+        inst_sources.append("dblp")
+    inst_confidence = "high" if (oa_inst and dblp_affiliation) else (
+        "medium" if inst_name else "unknown"
+    )
     tier_info = institution_clf.classify(inst_name, country_code)
+    tier = tier_info.get("tier")
+
+    # Search-stage hints (resolved from per-year affiliations) take precedence
+    # over OpenAlex's stale last_known_institutions.
+    if hint_institution:
+        inst_name = hint_institution
+        if "openalex_affiliations" not in inst_sources:
+            inst_sources = ["openalex_affiliations"] + inst_sources
+        inst_confidence = "high"
+    if hint_country:
+        country_code = hint_country
+    if hint_tier is not None:
+        tier = hint_tier
 
     first_pub_year = dblp_record.get("first_pub_year") if dblp_record else None
     seniority = compute_seniority(first_pub_year) if first_pub_year else None
@@ -110,13 +161,9 @@ async def get_professor_details_impl(
         "openalex_id": openalex_id,
         "dblp_pid": dblp_pid,
         "name": oa_author.get("name", ""),
-        "institution": _sourced(
-            inst_name,
-            ["openalex"] + (["homepage"] if position_val else []),
-            "high" if inst_name else "unknown",
-        ),
+        "institution": _sourced(inst_name, inst_sources, inst_confidence),
         "country_code": country_code,
-        "institution_tier": tier_info.get("tier"),
+        "institution_tier": tier,
         "position": _sourced(
             position_val,
             ["homepage"] if position_val else [],
@@ -147,5 +194,5 @@ async def get_professor_details_impl(
         "accepting_students_signal": homepage_data.get("accepting_signal"),
     }
 
-    cache.set(openalex_id, result, "professor_details", ttl_seconds=Cache.PROFESSOR_TTL)
+    store.upsert_profile(result)
     return result

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..utils.text_processing import compute_keyword_overlap
+from ..utils.text_processing import (
+    compute_keyword_overlap,
+    compute_weighted_overlap,
+    flexible_phrase_match,
+)
 
 _PRESETS = {
     "blockchain_security": [
@@ -23,17 +27,59 @@ _PRESETS = {
     ],
 }
 
+# Precision gating. Some terms are ambiguous across fields (e.g. "consensus" and
+# "byzantine fault tolerance" appear in federated-learning and general distributed
+# systems papers, not just blockchain). To keep results on-domain we gate on the
+# domain's UNAMBIGUOUS core terms: a professor must match at least one of them.
+#
+# _DOMAIN_TRIGGERS detect which domain a search is about (from the user keywords).
+# _DOMAIN_CORE_TERMS are the unambiguous anchors used as the precision gate.
+_DOMAIN_TRIGGERS = {
+    "blockchain": [
+        "blockchain", "defi", "mev", "smart contract", "cryptocurrency", "web3",
+        "consensus", "order fairness", "fair ordering", "transaction ordering",
+        "frontrunning", "distributed ledger", "ethereum", "bitcoin",
+    ],
+}
+_DOMAIN_CORE_TERMS = {
+    "blockchain": [
+        "blockchain", "blockchains", "DeFi", "decentralized finance", "MEV",
+        "maximal extractable value", "smart contract", "smart contracts",
+        "cryptocurrency", "web3", "distributed ledger", "on-chain", "Ethereum",
+        "Bitcoin", "proof of stake", "proof of work", "rollup",
+        "permissioned blockchain", "fair ordering", "order fairness",
+        "DAG consensus", "blockchain consensus",
+    ],
+}
 
-def compute_professor_relevance(professor: dict, keywords: list[str]) -> float:
-    if not keywords:
-        return 0.0
+
+def derive_domain_anchors(keywords: list[str]) -> Optional[list[str]]:
+    """
+    If the search keywords clearly belong to a known domain, return that domain's
+    unambiguous core terms to use as a precision anchor (ANY-match). Returns None
+    when no domain is confidently detected.
+    """
+    blob = " ".join(keywords).lower()
+    for domain, triggers in _DOMAIN_TRIGGERS.items():
+        if any(t in blob for t in triggers):
+            return _DOMAIN_CORE_TERMS[domain]
+    return None
+
+
+def _professor_corpus(professor: dict) -> str:
+    """Concatenate concepts + recent paper titles/abstracts into one searchable string."""
     parts = list(professor.get("concepts") or [])
     for paper in professor.get("recent_papers") or []:
         if isinstance(paper, dict):
             parts.append(paper.get("title") or "")
             parts.append(paper.get("abstract") or "")
-    corpus = " ".join(parts)
-    return compute_keyword_overlap(keywords, corpus)
+    return " ".join(parts)
+
+
+def compute_professor_relevance(professor: dict, keywords: list[str]) -> float:
+    if not keywords:
+        return 0.0
+    return compute_keyword_overlap(keywords, _professor_corpus(professor))
 
 
 def _extract_keywords(user_interests: dict) -> list[str]:
@@ -72,12 +118,46 @@ async def rank_fit_impl(
 ) -> dict:
     keywords = _extract_keywords(user_interests)
     filters = filters or {}
+    required_keywords = filters.get("required_keywords") or []
+    min_relevance = filters.get("min_relevance", 0.0)
+
+    # Weighted scoring: when the caller supplies a topic/domain split
+    # (find_professors passes through intent analysis results), topic hits
+    # score topic_weight each and domain hits domain_weight each, so the
+    # search-stage keyword priority carries through to final ranking.
+    topic_keywords = user_interests.get("topic_keywords") or []
+    domain_keywords = user_interests.get("domain_keywords") or []
+    topic_weight = float(user_interests.get("topic_weight", 3.0))
+    domain_weight = float(user_interests.get("domain_weight", 1.0))
+    use_weighted = bool(topic_keywords or domain_keywords)
 
     ranked = []
     for prof in professors:
         if not _apply_filters(prof, filters):
             continue
-        score = compute_professor_relevance(prof, keywords)
+
+        corpus = _professor_corpus(prof)
+
+        # Domain anchor: professor must mention AT LEAST ONE required keyword.
+        # Pass a set of domain terms (e.g. ["blockchain", "DeFi", "consensus"])
+        # to exclude off-domain false positives (e.g. "FAIR data" or "fair
+        # allocation" papers) without dropping legitimate researchers who happen
+        # to phrase the domain differently.
+        if required_keywords and not any(
+            flexible_phrase_match(rk, corpus) for rk in required_keywords
+        ):
+            continue
+
+        if use_weighted:
+            score = compute_weighted_overlap(
+                topic_keywords, domain_keywords, corpus,
+                topic_weight=topic_weight, domain_weight=domain_weight,
+            )
+        else:
+            score = compute_keyword_overlap(keywords, corpus)
+        if score < min_relevance:
+            continue
+
         papers_summary = [
             {
                 "title": p.get("title") if isinstance(p, dict) else p.title,

@@ -29,7 +29,14 @@ _SEARCH_RESPONSE = {
 
 _PERSON_XML = """<?xml version="1.0"?>
 <dblpperson name="Percy Liang" pid="46/5782" n="150">
-  <note type="source:homepage">https://cs.stanford.edu/~pliang/</note>
+<person key="homepages/46/5782" mdate="2025-01-01">
+  <author pid="46/5782">Percy Liang</author>
+  <note type="affiliation">Stanford University, USA</note>
+  <note label="former" type="affiliation">UC Berkeley, USA</note>
+  <url>https://cs.stanford.edu/~pliang/</url>
+  <url>https://scholar.google.com/citations?user=xyz</url>
+  <url>https://orcid.org/0000-0000-0000-0000</url>
+</person>
   <r><article key="journals/corr/Liang2023" mdate="2023-01-01">
     <author>Percy Liang</author>
     <year>2023</year>
@@ -63,6 +70,10 @@ async def test_get_person_record(httpx_mock: HTTPXMock, svc):
         headers={"content-type": "application/xml"},
     )
     record = await svc.get_person_record("46/5782")
+    # homepage = first non-aggregator <url> (scholar/orcid excluded)
     assert record["homepage_url"] == "https://cs.stanford.edu/~pliang/"
+    # current affiliation = non-former affiliation note
+    assert record["affiliation"] == "Stanford University, USA"
+    assert "UC Berkeley, USA" in record["former_affiliations"]
     assert record["first_pub_year"] == 2010
     assert record["pid"] == "46/5782"

@@ -31,7 +31,37 @@ def _val(field) -> str:
     return str(field)
 
 
-def to_markdown(ranked: list[dict], include_summary: bool = False) -> str:
+def _homepage_cell(prof: dict) -> str:
+    """Render a clickable homepage link, or a search hint when no URL is known."""
+    url = prof.get("homepage_url")
+    if url:
+        return f"[link]({url})"
+    query = prof.get("homepage_search_query")
+    if query:
+        return f"_search:_ {query}"
+    return "-"
+
+
+def _top_papers_cell(entry: dict, prof: dict, max_papers: int = 2) -> str:
+    """Show the titles of the top 1-2 representative recent papers."""
+    papers = []
+    materials = entry.get("fit_materials") or {}
+    summary = materials.get("recent_papers_summary")
+    if summary:
+        papers = summary
+    else:
+        papers = prof.get("recent_papers") or []
+
+    titles = []
+    for p in papers[:max_papers]:
+        title = p.get("title") if isinstance(p, dict) else getattr(p, "title", None)
+        if title:
+            # Escape pipe chars so they don't break the table
+            titles.append(title.replace("|", "\\|"))
+    return "; ".join(titles) if titles else "-"
+
+
+def to_markdown(ranked: list[dict], include_summary: bool = True) -> str:
     rows = []
     for i, entry in enumerate(ranked, 1):
         prof = entry.get("professor", {})
@@ -45,11 +75,12 @@ def to_markdown(ranked: list[dict], include_summary: bool = False) -> str:
             _val(prof.get("citation_count")),
             prof.get("seniority") or "-",
             entry.get("relevance_signal", "-"),
-            prof.get("homepage_url") or "-",
+            _top_papers_cell(entry, prof),
+            _homepage_cell(prof),
         ])
     headers = [
         "#", "Name", "Institution", "Country", "Tier",
-        "h-index", "Citations", "Seniority", "Relevance", "Homepage",
+        "h-index", "Citations", "Seniority", "Relevance", "Top Papers", "Homepage",
     ]
     table = _pipe_table(headers, rows)
     summary = f"\n\n**Total:** {len(ranked)} professors" if include_summary else ""

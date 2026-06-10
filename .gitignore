@@ -5,3 +5,9 @@ dist/
 *.egg-info/
 .env
 professor_fit_cache.db
+professor_profiles.db
+professor_profiles.db-wal
+professor_profiles.db-shm
+professor_fit_*.md
+result/
+results/
